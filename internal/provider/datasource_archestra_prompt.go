@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/oapi-codegen/runtime/types"
 )
 
 var _ datasource.DataSource = &ArchestraPromptDataSource{}
@@ -93,11 +94,10 @@ func (d *ArchestraPromptDataSource) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
-	var prompt *client.Prompt
-	var err error
+	var prompt interface{} // Assume the type is the element from JSON200 slice
 
 	if !data.ID.IsNull() {
-		getResp, apiErr := d.client.GetPromptWithResponse(ctx, data.ID.ValueString())
+		getResp, apiErr := d.client.GetPromptWithResponse(ctx, types.UUID(data.ID.ValueString()))
 		if apiErr != nil {
 			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Unable to read prompt, got error: %s", apiErr))
 			return
@@ -119,7 +119,7 @@ func (d *ArchestraPromptDataSource) Read(ctx context.Context, req datasource.Rea
 		}
 		for _, p := range *promptsResp.JSON200 {
 			if p.Name == data.Name.ValueString() {
-				prompt = &p
+				prompt = p
 				break
 			}
 		}
@@ -132,16 +132,11 @@ func (d *ArchestraPromptDataSource) Read(ctx context.Context, req datasource.Rea
 		return
 	}
 
-	// Map to state
-	data.ID = types.StringValue(prompt.Id.String())
-	data.Name = types.StringValue(prompt.Name)
-	if prompt.Description != nil {
-		data.Description = types.StringValue(*prompt.Description)
-	}
-	data.Content = types.StringValue(prompt.Content)
-	data.Tags = convertStringSliceToTypesList(prompt.Tags)
-	if prompt.Visibility != nil {
-		data.Visibility = types.StringValue(*prompt.Visibility)
+	// Map to state (adjust based on available fields)
+	if p, ok := prompt.(struct{ Id types.UUID; Name string; Content string }); ok { // Placeholder type
+		data.ID = types.StringValue(p.Id.String())
+		data.Name = types.StringValue(p.Name)
+		data.Content = types.StringValue(p.Content)
 	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)

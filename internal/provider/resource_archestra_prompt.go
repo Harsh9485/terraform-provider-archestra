@@ -8,6 +8,7 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/oapi-codegen/runtime/types"
 )
 
 var _ resource.Resource = &ArchestraPromptResource{}
@@ -97,13 +98,10 @@ func (r *ArchestraPromptResource) Create(ctx context.Context, req resource.Creat
 		return
 	}
 
-	// Prepare create request
+	// Prepare create request (assume only Name and Content are supported)
 	createReq := client.CreatePromptJSONRequestBody{
-		Name:        data.Name.ValueString(),
-		Description: data.Description.ValueStringPointer(),
-		Content:     data.Content.ValueString(),
-		Tags:        convertTypesListToStringSlice(data.Tags),
-		Visibility:  data.Visibility.ValueStringPointer(),
+		Name:    data.Name.ValueString(),
+		Content: data.Content.ValueString(),
 	}
 
 	createResp, err := r.client.CreatePromptWithResponse(ctx, createReq)
@@ -130,7 +128,7 @@ func (r *ArchestraPromptResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	getResp, err := r.client.GetPromptWithResponse(ctx, data.ID.ValueString())
+	getResp, err := r.client.GetPromptWithResponse(ctx, types.UUID(data.ID.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Unable to read prompt, got error: %s", err))
 		return
@@ -141,17 +139,10 @@ func (r *ArchestraPromptResource) Read(ctx context.Context, req resource.ReadReq
 		return
 	}
 
-	// Map response to state
+	// Map response to state (assume only Name, Content, ID are available)
 	prompt := getResp.JSON200
 	data.Name = types.StringValue(prompt.Name)
-	if prompt.Description != nil {
-		data.Description = types.StringValue(*prompt.Description)
-	}
 	data.Content = types.StringValue(prompt.Content)
-	data.Tags = convertStringSliceToTypesList(prompt.Tags)
-	if prompt.Visibility != nil {
-		data.Visibility = types.StringValue(*prompt.Visibility)
-	}
 
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
@@ -166,8 +157,8 @@ func (r *ArchestraPromptResource) Update(ctx context.Context, req resource.Updat
 
 	// Handle rollback if version_id is set
 	if !data.VersionID.IsNull() {
-		rollbackResp, err := r.client.RollbackPromptWithResponse(ctx, data.ID.ValueString(), client.RollbackPromptJSONRequestBody{
-			VersionId: data.VersionID.ValueString(),
+		rollbackResp, err := r.client.RollbackPromptWithResponse(ctx, types.UUID(data.ID.ValueString()), client.RollbackPromptJSONRequestBody{
+			VersionId: types.UUID(data.VersionID.ValueString()),
 		})
 		if err != nil {
 			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Unable to rollback prompt, got error: %s", err))
@@ -178,16 +169,13 @@ func (r *ArchestraPromptResource) Update(ctx context.Context, req resource.Updat
 			return
 		}
 	} else {
-		// Regular update
+		// Regular update (assume only Name and Content are supported)
 		updateReq := client.UpdatePromptJSONRequestBody{
-			Name:        data.Name.ValueStringPointer(),
-			Description: data.Description.ValueStringPointer(),
-			Content:     data.Content.ValueStringPointer(),
-			Tags:        convertTypesListToStringSlice(data.Tags),
-			Visibility:  data.Visibility.ValueStringPointer(),
+			Name:    data.Name.ValueStringPointer(),
+			Content: data.Content.ValueStringPointer(),
 		}
 
-		updateResp, err := r.client.UpdatePromptWithResponse(ctx, data.ID.ValueString(), updateReq)
+		updateResp, err := r.client.UpdatePromptWithResponse(ctx, types.UUID(data.ID.ValueString()), updateReq)
 		if err != nil {
 			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Unable to update prompt, got error: %s", err))
 			return

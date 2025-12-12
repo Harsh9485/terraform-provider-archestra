@@ -5,9 +5,11 @@ import (
 	"fmt"
 
 	"github.com/archestra-ai/archestra/terraform-provider-archestra/internal/client"
+	"github.com/hashicorp/terraform-plugin-framework/attr"
 	"github.com/hashicorp/terraform-plugin-framework/datasource"
 	"github.com/hashicorp/terraform-plugin-framework/datasource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/types"
+	"github.com/oapi-codegen/runtime/types"
 )
 
 var _ datasource.DataSource = &ArchestraPromptVersionsDataSource{}
@@ -93,7 +95,7 @@ func (d *ArchestraPromptVersionsDataSource) Read(ctx context.Context, req dataso
 		return
 	}
 
-	versionsResp, err := d.client.GetPromptVersionsWithResponse(ctx, data.PromptID.ValueString())
+	versionsResp, err := d.client.GetPromptVersionsWithResponse(ctx, types.UUID(data.PromptID.ValueString()))
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Unable to read prompt versions, got error: %s", err))
 		return
@@ -109,12 +111,12 @@ func (d *ArchestraPromptVersionsDataSource) Read(ctx context.Context, req dataso
 	for _, v := range *versionsResp.JSON200 {
 		versionList = append(versionList, PromptVersionModel{
 			ID:            types.StringValue(v.Id.String()),
-			VersionNumber: types.Int64Value(int64(v.VersionNumber)),
+			VersionNumber: types.Int64Value(int64(v.Version)), // Changed to Version
 			CreatedAt:     types.StringValue(v.CreatedAt.String()),
 		})
 	}
 
-	data.Versions, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: map[string]attr.Type{
+	data.Versions, _ = types.ListValueFrom(ctx, types.ObjectType{AttrTypes: map[string]attr.Type{ // Added attr import
 		"id":             types.StringType,
 		"version_number": types.Int64Type,
 		"created_at":     types.StringType,
